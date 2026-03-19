@@ -22,8 +22,6 @@
         .btn-green{background:#4CAF50;color:#fff}
         .btn-gray{background:#9E9E9E;color:#fff}
         .btn-outline{background:#fff;color:#4CAF50;border:2px solid #4CAF50}
-        .btn-blue{background:#2196F3;color:#fff}
-        .btn-small{padding:10px;font-size:15px;margin-top:8px}
         .user-select{display:flex;gap:10px;margin-bottom:16px}
         .user-btn{flex:1;padding:12px;border:2px solid #ddd;border-radius:10px;background:#fff;font-size:16px;font-weight:600;cursor:pointer;text-align:center;transition:all .2s}
         .user-btn.selected{border-color:#4CAF50;background:#E8F5E9;color:#2E7D32}
@@ -31,6 +29,7 @@
         .item-row{display:flex;justify-content:space-between;align-items:center;padding:8px 4px;border-bottom:1px solid #eee;font-size:14px}
         .item-row:last-child{border-bottom:none}
         .item-name{flex:1;margin-right:8px;word-break:break-word}
+        .item-details{color:#888;font-size:12px}
         .item-qty{color:#888;font-size:13px;margin-right:8px;white-space:nowrap}
         .item-price{font-weight:600;white-space:nowrap;color:#333}
         .item-delete{margin-left:8px;color:#e53935;cursor:pointer;font-size:18px;padding:0 4px}
@@ -47,7 +46,6 @@
         .prompt-box pre{white-space:pre-wrap;font-family:inherit;margin-bottom:8px}
         .prompt-toggle{background:none;border:none;color:#4CAF50;font-weight:600;font-size:14px;cursor:pointer;padding:0;text-decoration:underline}
         .copy-btn{background:#4CAF50;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:13px;cursor:pointer;font-weight:600}
-        .copy-btn:active{opacity:.7}
         .count-badge{display:inline-block;background:#4CAF50;color:#fff;border-radius:20px;padding:2px 10px;font-size:13px;margin-left:6px}
         .or-divider{text-align:center;color:#999;font-size:14px;margin:12px 0;position:relative}
         .or-divider::before,.or-divider::after{content:"";position:absolute;top:50%;width:40%;height:1px;background:#ddd}
@@ -83,7 +81,7 @@
 
 ДАТА: ДД.ММ.ГГГГ
 МАГАЗИН: название
-ТОВАР: название | кол-во | сумма
+ТОВАР: название | кол-во | цена за шт
 ИТОГО: число
 
 Числа без "руб" и "₽". Никаких комментариев и реквизитов.</pre>
@@ -103,13 +101,12 @@
         <label>Товары <span id="itemCount" class="count-badge">0</span></label>
         <div id="itemsList" class="items-list"></div>
 
-        <!-- Форма добавления товара -->
         <div class="add-form">
             <div class="add-form-title">＋ Добавить товар:</div>
             <div class="add-form-row">
-                <input class="add-name" id="addName" placeholder="Название" onkeydown="if(event.key==='Enter')addItemFromForm()">
-                <input class="add-qty" id="addQty" placeholder="Кол-во" value="1" onkeydown="if(event.key==='Enter')addItemFromForm()">
-                <input class="add-price" id="addPrice" placeholder="Цена" type="number" step="0.01" onkeydown="if(event.key==='Enter')addItemFromForm()">
+                <input class="add-name" id="addName" placeholder="Название" onkeydown="if(event.key==='Enter'){document.getElementById('addQty').focus()}">
+                <input class="add-qty" id="addQty" placeholder="Кол-во" value="1" onkeydown="if(event.key==='Enter'){document.getElementById('addPrice').focus()}">
+                <input class="add-price" id="addPrice" placeholder="Цена/шт" type="number" step="0.01" onkeydown="if(event.key==='Enter')addItemFromForm()">
             </div>
             <button class="add-btn" onclick="addItemFromForm()">＋ Добавить</button>
         </div>
@@ -143,7 +140,6 @@ function showScreen(id){document.querySelectorAll(".screen").forEach(function(s)
 function goBack(){showScreen("screen1")}
 function newReceipt(){document.getElementById("rawText").value="";parsedItems=[];showScreen("screen1")}
 function selectUser(btn){document.querySelectorAll(".user-btn").forEach(function(b){b.classList.remove("selected")});btn.classList.add("selected");currentUser=btn.dataset.user;localStorage.setItem("cheki_user",currentUser)}
-
 function togglePrompt(){document.getElementById("promptBox").classList.toggle("visible")}
 function copyPrompt(){
     var text=document.getElementById("promptText").textContent;
@@ -159,7 +155,13 @@ function findDate(t){var m=t.match(/(\d{2})[\.\/](\d{2})[\.\/](\d{4})/);if(m)ret
 function fmtP(n){return n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g," ")}
 function escH(t){var d=document.createElement("div");d.textContent=t;return d.innerHTML}
 
-// === ДОБАВЛЕНИЕ ТОВАРА ИЗ ФОРМЫ ===
+// === РАСЧЁТ СУММЫ ТОВАРА ===
+function calcItemSum(item){
+    var q=parseFloat(String(item.qty).replace(",","."))||1;
+    return Math.round(q*item.price*100)/100;
+}
+
+// === ДОБАВЛЕНИЕ ТОВАРА ===
 function addItemFromForm(){
     var nameEl=document.getElementById("addName");
     var qtyEl=document.getElementById("addQty");
@@ -169,16 +171,15 @@ function addItemFromForm(){
     var price=parseFloat(priceEl.value)||0;
 
     if(!name){alert("Введи название товара!");nameEl.focus();return}
-    if(price<=0){alert("Введи цену!");priceEl.focus();return}
+    if(price<=0){alert("Введи цену за штуку!");priceEl.focus();return}
 
-    parsedItems.push({name:name,qty:qty,price:price,sum:price});
-    renderItems();
-    recalcTotal();
+    var qtyNum=parseFloat(qty.replace(",","."))||1;
+    var sum=Math.round(qtyNum*price*100)/100;
 
-    // Очищаем форму
-    nameEl.value="";
-    qtyEl.value="1";
-    priceEl.value="";
+    parsedItems.push({name:name,qty:qty,price:price,sum:sum});
+    renderItems();recalcTotal();
+
+    nameEl.value="";qtyEl.value="1";priceEl.value="";
     nameEl.focus();
 }
 
@@ -191,7 +192,6 @@ function manualEntry(){
     document.getElementById("editDate").value=String(d.getDate()).padStart(2,"0")+"."+String(d.getMonth()+1).padStart(2,"0")+"."+d.getFullYear();
     renderItems();recalcTotal();
     showScreen("screen2");
-    // Фокус на поле названия
     setTimeout(function(){document.getElementById("addName").focus()},100);
 }
 
@@ -215,7 +215,7 @@ function parseReceipt(){
         shop=findShopSimple(lines);date=findDate(text);var r3=findItemsSimple(lines);items=r3.items;total=r3.total;
     }
 
-    if(total===0&&items.length>0){items.forEach(function(it){total+=it.sum||it.price});total=Math.round(total*100)/100}
+    if(total===0&&items.length>0){items.forEach(function(it){total+=it.sum||calcItemSum(it)});total=Math.round(total*100)/100}
 
     parsedItems=items;
     document.getElementById("editShop").value=shop;
@@ -235,7 +235,14 @@ function parseLabeled(text){
 
     if(/ТОВАР:.+\|/i.test(t)){
         var pr=/ТОВАР:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*([\d\s.,]+)/gi,m;
-        while((m=pr.exec(t))!==null){items.push({name:m[1].trim(),qty:m[2].trim(),price:pNum(m[3]),sum:pNum(m[3])})}
+        while((m=pr.exec(t))!==null){
+            var name=m[1].trim();
+            var qty=m[2].trim();
+            var price=pNum(m[3]);
+            var qtyNum=parseFloat(qty.replace(",","."))||1;
+            var sum=Math.round(qtyNum*price*100)/100;
+            items.push({name:name,qty:qty,price:price,sum:sum});
+        }
     }else{
         var itemTexts=[],prices=[];
         for(var i=0;i<lines.length;i++){var line=lines[i];
@@ -249,7 +256,8 @@ function parseLabeled(text){
             var name=itxt.replace(/\s*[-—]\s*[\d.,]+\s*(шт|кг|л|уп)\.?\s*/i,"").trim();
             if(price===0){var ip=name.match(/:\s*([\d\s.,]+)\s*$/);if(ip){price=pNum(ip[1]);name=name.replace(/:\s*[\d\s.,]+\s*$/,"").trim()}}
             if(/^(НДС|сумма НДС)/i.test(name)||name.length<2)continue;
-            items.push({name:name,qty:qty,price:price,sum:price});
+            var qtyN=parseFloat(String(qty).replace(",","."))||1;
+            items.push({name:name,qty:qty,price:price,sum:Math.round(qtyN*price*100)/100});
         }
     }
     var totalM=t.match(/(?:СУММА|ИТОГО):\s*([\d\s.,]+)/i);if(totalM)total=pNum(totalM[1]);
@@ -272,18 +280,19 @@ function parseNumbered(text){
         var name="",qty="1",price=0,sum=0;
 
         var mA=chunk.match(/^\d+\.\s+(.+?)\s*-\s*([\d.,]+)\s*(шт|кг|л|уп)\.?\s*(?:по|за|x|×)\s*([\d\s.,]+)\s*руб/i);
-        if(mA){name=mA[1].trim();qty=mA[2].replace(",",".")+" "+mA[3];price=pNum(mA[4]);sum=Math.round(price*parseFloat(mA[2].replace(",","."))*100)/100}
+        if(mA){name=mA[1].trim();qty=mA[2].replace(",",".")+" "+mA[3];price=pNum(mA[4]);var qN=parseFloat(mA[2].replace(",","."))||1;sum=Math.round(qN*price*100)/100}
 
         if(!name){var mB=chunk.match(/^\d+\.\s+(.+?)\s*-\s*кол-во:/i);
             if(mB){name=mB[1].trim();var qB=chunk.match(/кол-во:\s*([\d.,]+)/i);qty=qB?qB[1].replace(",","."):"?";
                 var pB=chunk.match(/цена:\s*([\d.,]+)/i);price=pB?pNum(pB[1]):0;
                 var sB=chunk.match(/сумма:\s*([\d.,]+)/i);sum=sB?pNum(sB[1]):0;
-                if(sum===0&&price>0&&qty!=="?")sum=Math.round(price*parseFloat(qty)*100)/100}}
+                if(sum===0&&price>0&&qty!=="?")sum=Math.round(parseFloat(qty)*price*100)/100}}
 
         if(!name){var mC=chunk.match(/^\d+\.\s+(.+?)(?:\s*\(код:[^)]*\))?\s*-\s*/);
             if(mC){name=mC[1].trim();var qC=chunk.match(/([\d.,]+)\s*(шт|кг|л|уп)/i);qty=qC?qC[1].replace(",",".")+" "+qC[2]:"1";
                 var pC=chunk.match(/цена:\s*([\d\s]+[.,]\d{2})\s*руб/i);price=pC?pNum(pC[1]):0;
-                var sC=chunk.match(/сумма:\s*([\d\s]+[.,]\d{2})\s*руб/i);sum=sC?pNum(sC[1]):price}}
+                var sC=chunk.match(/сумма:\s*([\d\s]+[.,]\d{2})\s*руб/i);sum=sC?pNum(sC[1]):0;
+                if(sum===0&&price>0){var qCN=parseFloat(String(qty).replace(",","."))||1;sum=Math.round(qCN*price*100)/100}}}
 
         if(/^(НДС|сумма НДС)/i.test(name))continue;
         if(name&&(sum>0||price>0))items.push({name:name,qty:qty,price:price,sum:sum});
@@ -325,10 +334,12 @@ function renderItems(){
     parsedItems.forEach(function(item,i){
         var row=document.createElement("div");row.className="item-row";
         var q=item.qty||"1";
-        var showQ=(q!=="1"&&q!=="?")?'<span class="item-qty">'+escH(q)+'</span>':"";
+        var qNum=parseFloat(String(q).replace(",","."))||1;
+        var showQ=(qNum!==1)?'<span class="item-qty">'+escH(q)+' × '+fmtP(item.price)+'</span>':"";
+        var itemSum=item.sum||calcItemSum(item);
         row.innerHTML=
             '<span class="item-name">'+escH(item.name)+'</span>'+showQ+
-            '<span class="item-price">'+fmtP(item.sum||item.price)+' ₽</span>'+
+            '<span class="item-price">'+fmtP(itemSum)+' ₽</span>'+
             '<span class="item-delete" onclick="deleteItem('+i+')">✕</span>';
         c.appendChild(row);
     });
@@ -338,7 +349,7 @@ function renderItems(){
 function deleteItem(i){parsedItems.splice(i,1);renderItems();recalcTotal()}
 
 function recalcTotal(){
-    var t=0;parsedItems.forEach(function(it){t+=(it.sum||it.price)});
+    var t=0;parsedItems.forEach(function(it){t+=(it.sum||calcItemSum(it))});
     document.getElementById("editTotal").textContent=fmtP(Math.round(t*100)/100)+" ₽";
     document.getElementById("itemCount").textContent=parsedItems.length;
 }
@@ -354,7 +365,7 @@ function saveToSheet(){
     showScreen("screenLoading");
 
     var itemsForSheet=parsedItems.map(function(it){
-        return{name:it.name,qty:it.qty||"1",price:it.sum||it.price};
+        return{name:it.name,qty:it.qty||"1",price:it.sum||calcItemSum(it)};
     });
 
     var payload={action:"save",shop:shop,date:date,items:itemsForSheet,total:total,user:currentUser};
