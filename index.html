@@ -27,20 +27,13 @@
         .user-select{display:flex;gap:10px;margin-bottom:16px}
         .user-btn{flex:1;padding:12px;border:2px solid #ddd;border-radius:10px;background:#fff;font-size:16px;font-weight:600;cursor:pointer;text-align:center;transition:all .2s}
         .user-btn.selected{border-color:#4CAF50;background:#E8F5E9;color:#2E7D32}
-        .items-list{background:#fff;border:2px solid #ddd;border-radius:10px;padding:8px;max-height:500px;overflow-y:auto}
-        .item-row{padding:8px 4px;border-bottom:1px solid #eee;font-size:14px}
+        .items-list{background:#fff;border:2px solid #ddd;border-radius:10px;padding:8px;max-height:400px;overflow-y:auto}
+        .item-row{display:flex;justify-content:space-between;align-items:center;padding:8px 4px;border-bottom:1px solid #eee;font-size:14px}
         .item-row:last-child{border-bottom:none}
-        .item-row-top{display:flex;justify-content:space-between;align-items:center}
         .item-name{flex:1;margin-right:8px;word-break:break-word}
         .item-qty{color:#888;font-size:13px;margin-right:8px;white-space:nowrap}
         .item-price{font-weight:600;white-space:nowrap;color:#333}
         .item-delete{margin-left:8px;color:#e53935;cursor:pointer;font-size:18px;padding:0 4px}
-        .item-edit{display:none;margin-top:8px}
-        .item-edit.open{display:flex;gap:6px;flex-wrap:wrap}
-        .item-edit input{padding:8px;font-size:14px;border-radius:8px}
-        .item-edit .edit-name{flex:2;min-width:120px}
-        .item-edit .edit-qty{flex:0.7;min-width:60px}
-        .item-edit .edit-price{flex:1;min-width:80px}
         .total-line{display:flex;justify-content:space-between;font-size:18px;font-weight:700;padding:12px 4px;border-top:2px solid #4CAF50;margin-top:8px}
         .result-icon{text-align:center;font-size:64px;margin:30px 0 16px}
         .result-text{text-align:center;font-size:20px;font-weight:600;margin-bottom:30px}
@@ -49,7 +42,7 @@
         .spinner{display:inline-block;width:24px;height:24px;border:3px solid #ddd;border-top-color:#4CAF50;border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-right:8px}
         @keyframes spin{to{transform:rotate(360deg)}}
         .hint{background:#FFF3E0;border:1px solid #FFB74D;border-radius:10px;padding:12px;margin-bottom:16px;font-size:13px;color:#E65100;line-height:1.4}
-        .prompt-box{background:#E8F5E9;border:2px solid #4CAF50;border-radius:10px;padding:12px;margin-bottom:16px;font-size:12px;color:#2E7D32;line-height:1.5;position:relative;display:none}
+        .prompt-box{background:#E8F5E9;border:2px solid #4CAF50;border-radius:10px;padding:12px;margin-bottom:16px;font-size:12px;color:#2E7D32;line-height:1.5;display:none}
         .prompt-box.visible{display:block}
         .prompt-box pre{white-space:pre-wrap;font-family:inherit;margin-bottom:8px}
         .prompt-toggle{background:none;border:none;color:#4CAF50;font-weight:600;font-size:14px;cursor:pointer;padding:0;text-decoration:underline}
@@ -59,6 +52,15 @@
         .or-divider{text-align:center;color:#999;font-size:14px;margin:12px 0;position:relative}
         .or-divider::before,.or-divider::after{content:"";position:absolute;top:50%;width:40%;height:1px;background:#ddd}
         .or-divider::before{left:0}.or-divider::after{right:0}
+        .add-form{background:#E3F2FD;border:2px solid #2196F3;border-radius:10px;padding:12px;margin-top:12px}
+        .add-form-title{font-weight:600;font-size:14px;color:#1565C0;margin-bottom:8px}
+        .add-form-row{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap}
+        .add-form-row input{border-radius:8px;padding:10px;font-size:14px;border:2px solid #ddd}
+        .add-form-row .add-name{flex:2;min-width:120px}
+        .add-form-row .add-qty{flex:0.6;min-width:55px}
+        .add-form-row .add-price{flex:1;min-width:75px}
+        .add-btn{background:#2196F3;color:#fff;border:none;border-radius:10px;padding:12px;font-size:15px;font-weight:600;cursor:pointer;width:100%}
+        .add-btn:active{opacity:.7}
     </style>
 </head>
 <body>
@@ -71,13 +73,11 @@
         <div class="user-btn" data-user="Саша" onclick="selectUser(this)">Саша</div>
         <div class="user-btn" data-user="Дима" onclick="selectUser(this)">Дима</div>
     </div>
-
     <div class="hint">
         📱 Откройте Алису → отправьте промт (ниже) → сфотографируйте чек → скопируйте ответ → вставьте сюда
         <br><br>
         <button class="prompt-toggle" onclick="togglePrompt()">📋 Показать промт для Алисы</button>
     </div>
-
     <div id="promptBox" class="prompt-box">
         <pre id="promptText">Распознай чек с фото. Выдай ТОЛЬКО в таком формате:
 
@@ -89,7 +89,6 @@
 Числа без "руб" и "₽". Никаких комментариев и реквизитов.</pre>
         <button class="copy-btn" onclick="copyPrompt()">📋 Скопировать промт</button>
     </div>
-
     <div class="field"><label for="rawText">Текст от Алисы:</label><textarea id="rawText" placeholder="Вставь текст от Алисы..."></textarea></div>
     <button class="btn btn-green" onclick="parseReceipt()">🔍 Распознать</button>
     <div class="or-divider">или</div>
@@ -103,7 +102,18 @@
     <div class="field">
         <label>Товары <span id="itemCount" class="count-badge">0</span></label>
         <div id="itemsList" class="items-list"></div>
-        <button class="btn btn-blue btn-small" onclick="addItem()">＋ Добавить товар</button>
+
+        <!-- Форма добавления товара -->
+        <div class="add-form">
+            <div class="add-form-title">＋ Добавить товар:</div>
+            <div class="add-form-row">
+                <input class="add-name" id="addName" placeholder="Название" onkeydown="if(event.key==='Enter')addItemFromForm()">
+                <input class="add-qty" id="addQty" placeholder="Кол-во" value="1" onkeydown="if(event.key==='Enter')addItemFromForm()">
+                <input class="add-price" id="addPrice" placeholder="Цена" type="number" step="0.01" onkeydown="if(event.key==='Enter')addItemFromForm()">
+            </div>
+            <button class="add-btn" onclick="addItemFromForm()">＋ Добавить</button>
+        </div>
+
         <div class="total-line"><span>Итого:</span><span id="editTotal">0 ₽</span></div>
     </div>
     <button class="btn btn-green" onclick="saveToSheet()">💾 Сохранить в таблицу</button>
@@ -134,10 +144,10 @@ function goBack(){showScreen("screen1")}
 function newReceipt(){document.getElementById("rawText").value="";parsedItems=[];showScreen("screen1")}
 function selectUser(btn){document.querySelectorAll(".user-btn").forEach(function(b){b.classList.remove("selected")});btn.classList.add("selected");currentUser=btn.dataset.user;localStorage.setItem("cheki_user",currentUser)}
 
-function togglePrompt(){var el=document.getElementById("promptBox");el.classList.toggle("visible")}
+function togglePrompt(){document.getElementById("promptBox").classList.toggle("visible")}
 function copyPrompt(){
     var text=document.getElementById("promptText").textContent;
-    navigator.clipboard.writeText(text).then(function(){alert("Промт скопирован! Вставь его в Алису.")}).catch(function(){
+    navigator.clipboard.writeText(text).then(function(){alert("Промт скопирован!")}).catch(function(){
         var ta=document.createElement("textarea");ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand("copy");document.body.removeChild(ta);alert("Промт скопирован!")
     });
 }
@@ -149,6 +159,29 @@ function findDate(t){var m=t.match(/(\d{2})[\.\/](\d{2})[\.\/](\d{4})/);if(m)ret
 function fmtP(n){return n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g," ")}
 function escH(t){var d=document.createElement("div");d.textContent=t;return d.innerHTML}
 
+// === ДОБАВЛЕНИЕ ТОВАРА ИЗ ФОРМЫ ===
+function addItemFromForm(){
+    var nameEl=document.getElementById("addName");
+    var qtyEl=document.getElementById("addQty");
+    var priceEl=document.getElementById("addPrice");
+    var name=nameEl.value.trim();
+    var qty=qtyEl.value.trim()||"1";
+    var price=parseFloat(priceEl.value)||0;
+
+    if(!name){alert("Введи название товара!");nameEl.focus();return}
+    if(price<=0){alert("Введи цену!");priceEl.focus();return}
+
+    parsedItems.push({name:name,qty:qty,price:price,sum:price});
+    renderItems();
+    recalcTotal();
+
+    // Очищаем форму
+    nameEl.value="";
+    qtyEl.value="1";
+    priceEl.value="";
+    nameEl.focus();
+}
+
 // === РУЧНОЙ ВВОД ===
 function manualEntry(){
     if(!currentUser){alert("Выбери кто отправляет!");return}
@@ -156,17 +189,10 @@ function manualEntry(){
     var d=new Date();
     document.getElementById("editShop").value="";
     document.getElementById("editDate").value=String(d.getDate()).padStart(2,"0")+"."+String(d.getMonth()+1).padStart(2,"0")+"."+d.getFullYear();
-    document.getElementById("itemCount").textContent="0";
-    renderItems();
-    document.getElementById("editTotal").textContent="0.00 ₽";
+    renderItems();recalcTotal();
     showScreen("screen2");
-}
-
-function addItem(){
-    parsedItems.push({name:"",qty:"1",price:0,sum:0,editing:true});
-    renderItems();
-    var inputs=document.querySelectorAll(".edit-name");
-    if(inputs.length>0)inputs[inputs.length-1].focus();
+    // Фокус на поле названия
+    setTimeout(function(){document.getElementById("addName").focus()},100);
 }
 
 // === ПАРСЕР ===
@@ -194,9 +220,7 @@ function parseReceipt(){
     parsedItems=items;
     document.getElementById("editShop").value=shop;
     document.getElementById("editDate").value=date;
-    document.getElementById("itemCount").textContent=items.length;
-    renderItems();
-    document.getElementById("editTotal").textContent=fmtP(total)+" ₽";
+    renderItems();recalcTotal();
     showScreen("screen2");
 }
 
@@ -295,37 +319,20 @@ function findItemsSimple(lines){
 function renderItems(){
     var c=document.getElementById("itemsList");c.innerHTML="";
     if(parsedItems.length===0){
-        c.innerHTML='<div style="padding:12px;color:#999;text-align:center">Нет товаров. Нажми «＋ Добавить товар»</div>';return;
+        c.innerHTML='<div style="padding:12px;color:#999;text-align:center">Нет товаров</div>';
+        document.getElementById("itemCount").textContent="0";return;
     }
     parsedItems.forEach(function(item,i){
         var row=document.createElement("div");row.className="item-row";
         var q=item.qty||"1";
         var showQ=(q!=="1"&&q!=="?")?'<span class="item-qty">'+escH(q)+'</span>':"";
-        var priceDisplay=fmtP(item.sum||item.price);
         row.innerHTML=
-            '<div class="item-row-top">'+
-                '<span class="item-name" onclick="toggleEdit('+i+')">'+(item.name?escH(item.name):'<i style="color:#999">нажми чтобы заполнить</i>')+'</span>'+
-                showQ+
-                '<span class="item-price">'+priceDisplay+' ₽</span>'+
-                '<span class="item-delete" onclick="deleteItem('+i+')">✕</span>'+
-            '</div>'+
-            '<div class="item-edit'+(item.editing?' open':'')+'" id="edit-'+i+'">'+
-                '<input class="edit-name" placeholder="Название" value="'+escH(item.name||"")+'" onchange="updateItem('+i+',\'name\',this.value)">'+
-                '<input class="edit-qty" placeholder="Кол-во" value="'+escH(q)+'" onchange="updateItem('+i+',\'qty\',this.value)">'+
-                '<input class="edit-price" placeholder="Цена" value="'+(item.sum||item.price||"")+'" onchange="updateItem('+i+',\'price\',this.value)" type="number" step="0.01">'+
-            '</div>';
+            '<span class="item-name">'+escH(item.name)+'</span>'+showQ+
+            '<span class="item-price">'+fmtP(item.sum||item.price)+' ₽</span>'+
+            '<span class="item-delete" onclick="deleteItem('+i+')">✕</span>';
         c.appendChild(row);
     });
     document.getElementById("itemCount").textContent=parsedItems.length;
-}
-
-function toggleEdit(i){var el=document.getElementById("edit-"+i);if(el)el.classList.toggle("open")}
-
-function updateItem(i,field,value){
-    if(field==="name")parsedItems[i].name=value;
-    else if(field==="qty")parsedItems[i].qty=value;
-    else if(field==="price"){var num=parseFloat(value)||0;parsedItems[i].price=num;parsedItems[i].sum=num}
-    renderItems();recalcTotal();
 }
 
 function deleteItem(i){parsedItems.splice(i,1);renderItems();recalcTotal()}
@@ -343,7 +350,6 @@ function saveToSheet(){
     var total=pNum(document.getElementById("editTotal").textContent.replace("₽",""));
     if(!shop){alert("Укажи магазин!");return}
     if(parsedItems.length===0){alert("Нет товаров!");return}
-    for(var i=0;i<parsedItems.length;i++){if(!parsedItems[i].name){alert("Заполни название товара #"+(i+1));return}}
 
     showScreen("screenLoading");
 
