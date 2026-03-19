@@ -15,7 +15,7 @@
         label{display:block;font-weight:600;margin-bottom:6px;font-size:14px;color:#555}
         input,textarea{width:100%;padding:12px;border:2px solid #ddd;border-radius:10px;font-size:16px;font-family:inherit;background:#fff;-webkit-appearance:none}
         input:focus,textarea:focus{outline:none;border-color:#4CAF50}
-        textarea{min-height:200px;resize:vertical}
+        textarea{min-height:180px;resize:vertical}
         .field{margin-bottom:14px}
         .btn{display:block;width:100%;padding:14px;border:none;border-radius:12px;font-size:17px;font-weight:600;cursor:pointer;margin-top:12px;transition:opacity .2s}
         .btn:active{opacity:.7}
@@ -23,6 +23,7 @@
         .btn-gray{background:#9E9E9E;color:#fff}
         .btn-outline{background:#fff;color:#4CAF50;border:2px solid #4CAF50}
         .btn-blue{background:#2196F3;color:#fff}
+        .btn-small{padding:10px;font-size:15px;margin-top:8px}
         .user-select{display:flex;gap:10px;margin-bottom:16px}
         .user-btn{flex:1;padding:12px;border:2px solid #ddd;border-radius:10px;background:#fff;font-size:16px;font-weight:600;cursor:pointer;text-align:center;transition:all .2s}
         .user-btn.selected{border-color:#4CAF50;background:#E8F5E9;color:#2E7D32}
@@ -48,45 +49,68 @@
         .spinner{display:inline-block;width:24px;height:24px;border:3px solid #ddd;border-top-color:#4CAF50;border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-right:8px}
         @keyframes spin{to{transform:rotate(360deg)}}
         .hint{background:#FFF3E0;border:1px solid #FFB74D;border-radius:10px;padding:12px;margin-bottom:16px;font-size:13px;color:#E65100;line-height:1.4}
+        .prompt-box{background:#E8F5E9;border:2px solid #4CAF50;border-radius:10px;padding:12px;margin-bottom:16px;font-size:12px;color:#2E7D32;line-height:1.5;position:relative;display:none}
+        .prompt-box.visible{display:block}
+        .prompt-box pre{white-space:pre-wrap;font-family:inherit;margin-bottom:8px}
+        .prompt-toggle{background:none;border:none;color:#4CAF50;font-weight:600;font-size:14px;cursor:pointer;padding:0;text-decoration:underline}
+        .copy-btn{background:#4CAF50;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:13px;cursor:pointer;font-weight:600}
+        .copy-btn:active{opacity:.7}
         .count-badge{display:inline-block;background:#4CAF50;color:#fff;border-radius:20px;padding:2px 10px;font-size:13px;margin-left:6px}
         .or-divider{text-align:center;color:#999;font-size:14px;margin:12px 0;position:relative}
         .or-divider::before,.or-divider::after{content:"";position:absolute;top:50%;width:40%;height:1px;background:#ddd}
-        .or-divider::before{left:0}
-        .or-divider::after{right:0}
+        .or-divider::before{left:0}.or-divider::after{right:0}
     </style>
 </head>
 <body>
 <h1>🧾 Чеки</h1>
 
-<!-- ЭКРАН 1: Ввод -->
+<!-- ЭКРАН 1 -->
 <div id="screen1" class="screen active">
     <label>Кто отправляет:</label>
     <div class="user-select">
         <div class="user-btn" data-user="Саша" onclick="selectUser(this)">Саша</div>
         <div class="user-btn" data-user="Дима" onclick="selectUser(this)">Дима</div>
     </div>
-    <div class="hint">📱 Алиса → «Распознай текст» → фото чека → скопируй текст → вставь сюда</div>
+
+    <div class="hint">
+        📱 Откройте Алису → отправьте промт (ниже) → сфотографируйте чек → скопируйте ответ → вставьте сюда
+        <br><br>
+        <button class="prompt-toggle" onclick="togglePrompt()">📋 Показать промт для Алисы</button>
+    </div>
+
+    <div id="promptBox" class="prompt-box">
+        <pre id="promptText">Распознай чек с фото. Выдай ТОЛЬКО в таком формате:
+
+ДАТА: ДД.ММ.ГГГГ
+МАГАЗИН: название
+ТОВАР: название | кол-во | сумма
+ИТОГО: число
+
+Числа без "руб" и "₽". Никаких комментариев и реквизитов.</pre>
+        <button class="copy-btn" onclick="copyPrompt()">📋 Скопировать промт</button>
+    </div>
+
     <div class="field"><label for="rawText">Текст от Алисы:</label><textarea id="rawText" placeholder="Вставь текст от Алисы..."></textarea></div>
     <button class="btn btn-green" onclick="parseReceipt()">🔍 Распознать</button>
     <div class="or-divider">или</div>
     <button class="btn btn-outline" onclick="manualEntry()">✏️ Заполнить вручную</button>
 </div>
 
-<!-- ЭКРАН 2: Проверка -->
+<!-- ЭКРАН 2 -->
 <div id="screen2" class="screen">
     <div class="field"><label for="editShop">Магазин:</label><input type="text" id="editShop"></div>
     <div class="field"><label for="editDate">Дата:</label><input type="text" id="editDate" placeholder="ДД.ММ.ГГГГ"></div>
     <div class="field">
         <label>Товары <span id="itemCount" class="count-badge">0</span></label>
         <div id="itemsList" class="items-list"></div>
-        <button class="btn btn-blue" onclick="addItem()" style="margin-top:8px;padding:10px;font-size:15px">＋ Добавить товар</button>
+        <button class="btn btn-blue btn-small" onclick="addItem()">＋ Добавить товар</button>
         <div class="total-line"><span>Итого:</span><span id="editTotal">0 ₽</span></div>
     </div>
     <button class="btn btn-green" onclick="saveToSheet()">💾 Сохранить в таблицу</button>
     <button class="btn btn-gray" onclick="goBack()">← Назад</button>
 </div>
 
-<!-- ЭКРАН 3: Результат -->
+<!-- ЭКРАН 3 -->
 <div id="screen3" class="screen">
     <div id="resultIcon" class="result-icon"></div>
     <div id="resultText" class="result-text"></div>
@@ -110,6 +134,14 @@ function goBack(){showScreen("screen1")}
 function newReceipt(){document.getElementById("rawText").value="";parsedItems=[];showScreen("screen1")}
 function selectUser(btn){document.querySelectorAll(".user-btn").forEach(function(b){b.classList.remove("selected")});btn.classList.add("selected");currentUser=btn.dataset.user;localStorage.setItem("cheki_user",currentUser)}
 
+function togglePrompt(){var el=document.getElementById("promptBox");el.classList.toggle("visible")}
+function copyPrompt(){
+    var text=document.getElementById("promptText").textContent;
+    navigator.clipboard.writeText(text).then(function(){alert("Промт скопирован! Вставь его в Алису.")}).catch(function(){
+        var ta=document.createElement("textarea");ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand("copy");document.body.removeChild(ta);alert("Промт скопирован!")
+    });
+}
+
 // === УТИЛИТЫ ===
 function norm(t){return t.replace(/[\u2010-\u2015\u2212\uFE58\uFE63\uFF0D]/g,"-").replace(/[\u00A0\u2007\u202F]/g," ")}
 function pNum(s){if(!s)return 0;s=s.replace(/\.\s*$/,"");var n=parseFloat(s.replace(/\s/g,"").replace(",","."));return isNaN(n)?0:n}
@@ -130,11 +162,9 @@ function manualEntry(){
     showScreen("screen2");
 }
 
-// === ДОБАВИТЬ ТОВАР ===
 function addItem(){
     parsedItems.push({name:"",qty:"1",price:0,sum:0,editing:true});
     renderItems();
-    // Фокус на новое поле названия
     var inputs=document.querySelectorAll(".edit-name");
     if(inputs.length>0)inputs[inputs.length-1].focus();
 }
@@ -261,21 +291,17 @@ function findItemsSimple(lines){
     return{items:items,total:total};
 }
 
-// ==========================================
-// ОТРИСОВКА (с редактированием)
-// ==========================================
+// === ОТРИСОВКА ===
 function renderItems(){
     var c=document.getElementById("itemsList");c.innerHTML="";
-    if(parsedItems.length===0&&!document.querySelector(".item-row")){
-        c.innerHTML='<div style="padding:12px;color:#999;text-align:center">Нет товаров. Нажми «＋ Добавить товар»</div>';
-        return;
+    if(parsedItems.length===0){
+        c.innerHTML='<div style="padding:12px;color:#999;text-align:center">Нет товаров. Нажми «＋ Добавить товар»</div>';return;
     }
     parsedItems.forEach(function(item,i){
         var row=document.createElement("div");row.className="item-row";
         var q=item.qty||"1";
         var showQ=(q!=="1"&&q!=="?")?'<span class="item-qty">'+escH(q)+'</span>':"";
         var priceDisplay=fmtP(item.sum||item.price);
-
         row.innerHTML=
             '<div class="item-row-top">'+
                 '<span class="item-name" onclick="toggleEdit('+i+')">'+(item.name?escH(item.name):'<i style="color:#999">нажми чтобы заполнить</i>')+'</span>'+
@@ -286,35 +312,23 @@ function renderItems(){
             '<div class="item-edit'+(item.editing?' open':'')+'" id="edit-'+i+'">'+
                 '<input class="edit-name" placeholder="Название" value="'+escH(item.name||"")+'" onchange="updateItem('+i+',\'name\',this.value)">'+
                 '<input class="edit-qty" placeholder="Кол-во" value="'+escH(q)+'" onchange="updateItem('+i+',\'qty\',this.value)">'+
-                '<input class="edit-price" placeholder="Сумма" value="'+(item.sum||item.price||"")+'" onchange="updateItem('+i+',\'price\',this.value)" type="number" step="0.01">'+
+                '<input class="edit-price" placeholder="Цена" value="'+(item.sum||item.price||"")+'" onchange="updateItem('+i+',\'price\',this.value)" type="number" step="0.01">'+
             '</div>';
         c.appendChild(row);
     });
     document.getElementById("itemCount").textContent=parsedItems.length;
 }
 
-function toggleEdit(i){
-    var el=document.getElementById("edit-"+i);
-    if(el){el.classList.toggle("open")}
-}
+function toggleEdit(i){var el=document.getElementById("edit-"+i);if(el)el.classList.toggle("open")}
 
 function updateItem(i,field,value){
-    if(field==="name"){
-        parsedItems[i].name=value;
-    }else if(field==="qty"){
-        parsedItems[i].qty=value;
-    }else if(field==="price"){
-        var num=parseFloat(value)||0;
-        parsedItems[i].price=num;
-        parsedItems[i].sum=num;
-    }
-    renderItems();
-    recalcTotal();
+    if(field==="name")parsedItems[i].name=value;
+    else if(field==="qty")parsedItems[i].qty=value;
+    else if(field==="price"){var num=parseFloat(value)||0;parsedItems[i].price=num;parsedItems[i].sum=num}
+    renderItems();recalcTotal();
 }
 
-function deleteItem(i){
-    parsedItems.splice(i,1);renderItems();recalcTotal();
-}
+function deleteItem(i){parsedItems.splice(i,1);renderItems();recalcTotal()}
 
 function recalcTotal(){
     var t=0;parsedItems.forEach(function(it){t+=(it.sum||it.price)});
@@ -322,27 +336,19 @@ function recalcTotal(){
     document.getElementById("itemCount").textContent=parsedItems.length;
 }
 
-// ==========================================
-// СОХРАНЕНИЕ
-// ==========================================
+// === СОХРАНЕНИЕ ===
 function saveToSheet(){
     var shop=document.getElementById("editShop").value.trim();
     var date=document.getElementById("editDate").value.trim();
     var total=pNum(document.getElementById("editTotal").textContent.replace("₽",""));
     if(!shop){alert("Укажи магазин!");return}
     if(parsedItems.length===0){alert("Нет товаров!");return}
-
-    // Проверяем что все товары заполнены
-    for(var i=0;i<parsedItems.length;i++){
-        if(!parsedItems[i].name){alert("Заполни название товара #"+(i+1));return}
-    }
+    for(var i=0;i<parsedItems.length;i++){if(!parsedItems[i].name){alert("Заполни название товара #"+(i+1));return}}
 
     showScreen("screenLoading");
 
     var itemsForSheet=parsedItems.map(function(it){
-        var n=it.name;var q=it.qty||"1";
-        if(q!=="1"&&q!=="?")n+=" ("+q+")";
-        return{name:n,price:it.sum||it.price};
+        return{name:it.name,qty:it.qty||"1",price:it.sum||it.price};
     });
 
     var payload={action:"save",shop:shop,date:date,items:itemsForSheet,total:total,user:currentUser};
