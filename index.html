@@ -29,7 +29,6 @@
         .item-row{display:flex;justify-content:space-between;align-items:center;padding:8px 4px;border-bottom:1px solid #eee;font-size:14px}
         .item-row:last-child{border-bottom:none}
         .item-name{flex:1;margin-right:8px;word-break:break-word}
-        .item-details{color:#888;font-size:12px}
         .item-qty{color:#888;font-size:13px;margin-right:8px;white-space:nowrap}
         .item-price{font-weight:600;white-space:nowrap;color:#333}
         .item-delete{margin-left:8px;color:#e53935;cursor:pointer;font-size:18px;padding:0 4px}
@@ -59,6 +58,7 @@
         .add-form-row .add-price{flex:1;min-width:75px}
         .add-btn{background:#2196F3;color:#fff;border:none;border-radius:10px;padding:12px;font-size:15px;font-weight:600;cursor:pointer;width:100%}
         .add-btn:active{opacity:.7}
+        .mode-label{text-align:center;font-size:13px;color:#888;margin-bottom:4px}
     </style>
 </head>
 <body>
@@ -66,11 +66,13 @@
 
 <!-- ЭКРАН 1 -->
 <div id="screen1" class="screen active">
-    <label>Кто отправляет:</label>
+    <label>Куда записывать:</label>
     <div class="user-select">
-        <div class="user-btn" data-user="Саша" onclick="selectUser(this)">Саша</div>
         <div class="user-btn" data-user="Дима" onclick="selectUser(this)">Дима</div>
+        <div class="user-btn" data-user="Стол Заказов" onclick="selectUser(this)">Стол Заказов</div>
     </div>
+    <div id="modeLabel" class="mode-label"></div>
+
     <div class="hint">
         📱 Откройте Алису → отправьте промт (ниже) → сфотографируйте чек → скопируйте ответ → вставьте сюда
         <br><br>
@@ -95,7 +97,9 @@
 
 <!-- ЭКРАН 2 -->
 <div id="screen2" class="screen">
-    <div class="field"><label for="editShop">Магазин:</label><input type="text" id="editShop"></div>
+    <div id="dimaFields">
+        <div class="field"><label for="editShop">Магазин:</label><input type="text" id="editShop"></div>
+    </div>
     <div class="field"><label for="editDate">Дата:</label><input type="text" id="editDate" placeholder="ДД.ММ.ГГГГ"></div>
     <div class="field">
         <label>Товары <span id="itemCount" class="count-badge">0</span></label>
@@ -129,17 +133,57 @@
 </div>
 
 <script>
-var APPS_SCRIPT_URL="https://script.google.com/macros/s/AKfycbxhv8Ur7DVQKd6J6gwQV5lVrCFApQrEZbjleVNiPeZHOlLUe7qojKr6EvZqLColE5Ehag/exec";
-var currentUser=localStorage.getItem("cheki_user")||"";
-var parsedItems=[];
+// === НАСТРОЙКИ ТАБЛИЦ ===
+var CONFIG = {
+    "Дима": {
+        scriptUrl: "https://script.google.com/macros/s/AKfycbxhv8Ur7DVQKd6J6gwQV5lVrCFApQrEZbjleVNiPeZHOlLUe7qojKr6EvZqLColE5Ehag/exec",
+        mode: "dima" // старый формат
+    },
+    "Стол Заказов": {
+        scriptUrl: "https://script.google.com/macros/s/AKfycbxiHCZDLRzRLlNynsFdJz-ay7OhuDF9lO3AiRcb--Um_yATCh6HKmHZS-kIhgdoxBLtxw/exec",
+        spreadsheetId: "1FwfUz2nFk0faLdhbohwG4FGmyPZ8nTg9QSRBITT-VCY",
+        sheetName: "Лист1",
+        cols: {name: "B", qty: "C", price: "D"},
+        mode: "universal"
+    }
+};
 
-document.addEventListener("DOMContentLoaded",function(){
-    if(currentUser){document.querySelectorAll(".user-btn").forEach(function(b){if(b.dataset.user===currentUser)b.classList.add("selected")})}
+var currentUser = localStorage.getItem("cheki_user") || "";
+var parsedItems = [];
+
+document.addEventListener("DOMContentLoaded", function(){
+    if(currentUser){
+        document.querySelectorAll(".user-btn").forEach(function(b){
+            if(b.dataset.user===currentUser) b.classList.add("selected");
+        });
+        updateModeLabel();
+    }
 });
+
 function showScreen(id){document.querySelectorAll(".screen").forEach(function(s){s.classList.remove("active")});document.getElementById(id).classList.add("active");window.scrollTo(0,0)}
 function goBack(){showScreen("screen1")}
 function newReceipt(){document.getElementById("rawText").value="";parsedItems=[];showScreen("screen1")}
-function selectUser(btn){document.querySelectorAll(".user-btn").forEach(function(b){b.classList.remove("selected")});btn.classList.add("selected");currentUser=btn.dataset.user;localStorage.setItem("cheki_user",currentUser)}
+
+function selectUser(btn){
+    document.querySelectorAll(".user-btn").forEach(function(b){b.classList.remove("selected")});
+    btn.classList.add("selected");
+    currentUser=btn.dataset.user;
+    localStorage.setItem("cheki_user",currentUser);
+    updateModeLabel();
+}
+
+function updateModeLabel(){
+    var el=document.getElementById("modeLabel");
+    var cfg=CONFIG[currentUser];
+    if(!cfg){el.textContent="";return}
+    if(currentUser==="Дима") el.textContent="📊 Таблица Димы";
+    else el.textContent="📊 Стол Заказов";
+
+    // Показываем/скрываем поле магазина
+    var dimaFields=document.getElementById("dimaFields");
+    if(dimaFields) dimaFields.style.display=(currentUser==="Дима")?"block":"none";
+}
+
 function togglePrompt(){document.getElementById("promptBox").classList.toggle("visible")}
 function copyPrompt(){
     var text=document.getElementById("promptText").textContent;
@@ -154,12 +198,7 @@ function pNum(s){if(!s)return 0;s=s.replace(/\.\s*$/,"");var n=parseFloat(s.repl
 function findDate(t){var m=t.match(/(\d{2})[\.\/](\d{2})[\.\/](\d{4})/);if(m)return m[1]+"."+m[2]+"."+m[3];m=t.match(/(\d{2})[\.\/](\d{2})[\.\/](\d{2})\b/);if(m)return m[1]+"."+m[2]+".20"+m[3];var d=new Date();return String(d.getDate()).padStart(2,"0")+"."+String(d.getMonth()+1).padStart(2,"0")+"."+d.getFullYear()}
 function fmtP(n){return n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g," ")}
 function escH(t){var d=document.createElement("div");d.textContent=t;return d.innerHTML}
-
-// === РАСЧЁТ СУММЫ ТОВАРА ===
-function calcItemSum(item){
-    var q=parseFloat(String(item.qty).replace(",","."))||1;
-    return Math.round(q*item.price*100)/100;
-}
+function calcItemSum(item){var q=parseFloat(String(item.qty).replace(",","."))||1;return Math.round(q*item.price*100)/100}
 
 // === ДОБАВЛЕНИЕ ТОВАРА ===
 function addItemFromForm(){
@@ -169,28 +208,22 @@ function addItemFromForm(){
     var name=nameEl.value.trim();
     var qty=qtyEl.value.trim()||"1";
     var price=parseFloat(priceEl.value)||0;
-
-    if(!name){alert("Введи название товара!");nameEl.focus();return}
-    if(price<=0){alert("Введи цену за штуку!");priceEl.focus();return}
-
+    if(!name){alert("Введи название!");nameEl.focus();return}
+    if(price<=0){alert("Введи цену!");priceEl.focus();return}
     var qtyNum=parseFloat(qty.replace(",","."))||1;
     var sum=Math.round(qtyNum*price*100)/100;
-
     parsedItems.push({name:name,qty:qty,price:price,sum:sum});
     renderItems();recalcTotal();
-
-    nameEl.value="";qtyEl.value="1";priceEl.value="";
-    nameEl.focus();
+    nameEl.value="";qtyEl.value="1";priceEl.value="";nameEl.focus();
 }
 
-// === РУЧНОЙ ВВОД ===
 function manualEntry(){
-    if(!currentUser){alert("Выбери кто отправляет!");return}
+    if(!currentUser){alert("Выбери куда записывать!");return}
     parsedItems=[];
     var d=new Date();
     document.getElementById("editShop").value="";
     document.getElementById("editDate").value=String(d.getDate()).padStart(2,"0")+"."+String(d.getMonth()+1).padStart(2,"0")+"."+d.getFullYear();
-    renderItems();recalcTotal();
+    renderItems();recalcTotal();updateModeLabel();
     showScreen("screen2");
     setTimeout(function(){document.getElementById("addName").focus()},100);
 }
@@ -199,178 +232,114 @@ function manualEntry(){
 function parseReceipt(){
     var raw=document.getElementById("rawText").value.trim();
     if(!raw){alert("Вставь текст чека!");return}
-    if(!currentUser){alert("Выбери кто отправляет!");return}
+    if(!currentUser){alert("Выбери куда записывать!");return}
     var text=norm(raw);
     var shop="",date="",items=[],total=0;
-
     var hasLabels=/(?:ДАТА_ЧЕКА|МАГАЗИН|ТОВАР):/i.test(text);
     var hasNumberedItems=/\d+\.\s+.+[-—]/i.test(text);
-
-    if(hasLabels&&!hasNumberedItems){
-        var r=parseLabeled(text);shop=r.shop;date=r.date;items=r.items;total=r.total;
-    }else if(hasNumberedItems){
-        var r2=parseNumbered(text);shop=r2.shop;date=r2.date;items=r2.items;total=r2.total;
-    }else{
-        var lines=text.split("\n").map(function(l){return l.trim()}).filter(function(l){return l});
-        shop=findShopSimple(lines);date=findDate(text);var r3=findItemsSimple(lines);items=r3.items;total=r3.total;
-    }
-
+    if(hasLabels&&!hasNumberedItems){var r=parseLabeled(text);shop=r.shop;date=r.date;items=r.items;total=r.total}
+    else if(hasNumberedItems){var r2=parseNumbered(text);shop=r2.shop;date=r2.date;items=r2.items;total=r2.total}
+    else{var lines=text.split("\n").map(function(l){return l.trim()}).filter(function(l){return l});shop=findShopSimple(lines);date=findDate(text);var r3=findItemsSimple(lines);items=r3.items;total=r3.total}
     if(total===0&&items.length>0){items.forEach(function(it){total+=it.sum||calcItemSum(it)});total=Math.round(total*100)/100}
-
     parsedItems=items;
     document.getElementById("editShop").value=shop;
     document.getElementById("editDate").value=date;
-    renderItems();recalcTotal();
+    renderItems();recalcTotal();updateModeLabel();
     showScreen("screen2");
 }
 
-// === ПАРСЕР С МЕТКАМИ ===
 function parseLabeled(text){
     var shop="",date="",items=[],total=0;
     var t=text.replace(/(ДАТА_ЧЕКА|ДАТА|МАГАЗИН|ТОВАР[ЫЬ]?|ЦЕНЫ?|КОЛ[_\s]?ВО|СУММА|ИТОГО|ВРЕМЯ[_\s]?ОТПРАВКИ):/gi,"\n$1:");
     var lines=t.split("\n").map(function(l){return l.trim()}).filter(function(l){return l});
-    var dm=t.match(/(?:ДАТА_ЧЕКА|ДАТА):\s*(\d{2}[\.\/]\d{2}[\.\/]\d{4})/i);
-    date=dm?dm[1].replace(/\//g,"."):findDate(text);
+    var dm=t.match(/(?:ДАТА_ЧЕКА|ДАТА):\s*(\d{2}[\.\/]\d{2}[\.\/]\d{4})/i);date=dm?dm[1].replace(/\//g,"."):findDate(text);
     var sm=t.match(/МАГАЗИН:\s*(.+)/im);shop=sm?sm[1].trim():"";
-
     if(/ТОВАР:.+\|/i.test(t)){
         var pr=/ТОВАР:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*([\d\s.,]+)/gi,m;
-        while((m=pr.exec(t))!==null){
-            var name=m[1].trim();
-            var qty=m[2].trim();
-            var price=pNum(m[3]);
-            var qtyNum=parseFloat(qty.replace(",","."))||1;
-            var sum=Math.round(qtyNum*price*100)/100;
-            items.push({name:name,qty:qty,price:price,sum:sum});
-        }
+        while((m=pr.exec(t))!==null){var nm=m[1].trim(),qt=m[2].trim(),p=pNum(m[3]),qn=parseFloat(qt.replace(",","."))||1;items.push({name:nm,qty:qt,price:p,sum:Math.round(qn*p*100)/100})}
     }else{
         var itemTexts=[],prices=[];
-        for(var i=0;i<lines.length;i++){var line=lines[i];
-            var tm=line.match(/^ТОВАР[ЫЬ]?:\s*(.+)/i);if(tm){itemTexts.push(tm[1].trim());continue}
-            var pm=line.match(/^ЦЕНЫ?:\s*([\d\s.,]+)/i);if(pm){prices.push(pNum(pm[1]));continue}
-        }
-        for(var j=0;j<itemTexts.length;j++){
-            var itxt=itemTexts[j],price=prices[j]||0;
-            var qm=itxt.match(/[-—]\s*([\d.,]+)\s*(шт|кг|л|уп)/i);
-            var qty=qm?qm[1].replace(",",".")+" "+qm[2]:"1";
-            var name=itxt.replace(/\s*[-—]\s*[\d.,]+\s*(шт|кг|л|уп)\.?\s*/i,"").trim();
-            if(price===0){var ip=name.match(/:\s*([\d\s.,]+)\s*$/);if(ip){price=pNum(ip[1]);name=name.replace(/:\s*[\d\s.,]+\s*$/,"").trim()}}
-            if(/^(НДС|сумма НДС)/i.test(name)||name.length<2)continue;
-            var qtyN=parseFloat(String(qty).replace(",","."))||1;
-            items.push({name:name,qty:qty,price:price,sum:Math.round(qtyN*price*100)/100});
-        }
+        for(var i=0;i<lines.length;i++){var line=lines[i];var tm2=line.match(/^ТОВАР[ЫЬ]?:\s*(.+)/i);if(tm2){itemTexts.push(tm2[1].trim());continue}var pm=line.match(/^ЦЕНЫ?:\s*([\d\s.,]+)/i);if(pm){prices.push(pNum(pm[1]));continue}}
+        for(var j=0;j<itemTexts.length;j++){var itxt=itemTexts[j],price=prices[j]||0;var qm=itxt.match(/[-—]\s*([\d.,]+)\s*(шт|кг|л|уп)/i);var qty=qm?qm[1].replace(",",".")+" "+qm[2]:"1";var name=itxt.replace(/\s*[-—]\s*[\d.,]+\s*(шт|кг|л|уп)\.?\s*/i,"").trim();if(price===0){var ip=name.match(/:\s*([\d\s.,]+)\s*$/);if(ip){price=pNum(ip[1]);name=name.replace(/:\s*[\d\s.,]+\s*$/,"").trim()}}if(/^(НДС|сумма НДС)/i.test(name)||name.length<2)continue;var qtyN=parseFloat(String(qty).replace(",","."))||1;items.push({name:name,qty:qty,price:price,sum:Math.round(qtyN*price*100)/100})}
     }
     var totalM=t.match(/(?:СУММА|ИТОГО):\s*([\d\s.,]+)/i);if(totalM)total=pNum(totalM[1]);
     return{shop:shop,date:date,items:items,total:total};
 }
 
-// === ПАРСЕР НУМЕРОВАННЫХ ===
 function parseNumbered(text){
     var shop="",date="",items=[],total=0;
-    var dm=text.match(/(?:дата чека|дата и время|дата)[:\s]*(\d{2}[\.\/]\d{2}[\.\/]\d{4})/i);
-    date=dm?dm[1].replace(/\//g,"."):findDate(text);
-    var sm=text.match(/(?:магазин|поставщик)[^:]*:\s*(.+?)(?:\s*СПИСОК|\s*\n|\s*\d+\.\s|$)/i);
-    if(!sm)sm=text.match(/[«"«]([^»"»]+)[»"»]/);
-    if(sm)shop=sm[1].trim().replace(/\s*\([^)]*склад[^)]*\)\s*$/i,"").trim();
-
-    var t=text.replace(/(\d+)\.\s+/g,"\n$1. ");
-    var chunks=t.split(/(?=\n\d+\.\s)/);
-    for(var i=0;i<chunks.length;i++){
-        var chunk=chunks[i].trim();if(!/^\d+\.\s/.test(chunk))continue;
-        var name="",qty="1",price=0,sum=0;
-
-        var mA=chunk.match(/^\d+\.\s+(.+?)\s*-\s*([\d.,]+)\s*(шт|кг|л|уп)\.?\s*(?:по|за|x|×)\s*([\d\s.,]+)\s*руб/i);
-        if(mA){name=mA[1].trim();qty=mA[2].replace(",",".")+" "+mA[3];price=pNum(mA[4]);var qN=parseFloat(mA[2].replace(",","."))||1;sum=Math.round(qN*price*100)/100}
-
-        if(!name){var mB=chunk.match(/^\d+\.\s+(.+?)\s*-\s*кол-во:/i);
-            if(mB){name=mB[1].trim();var qB=chunk.match(/кол-во:\s*([\d.,]+)/i);qty=qB?qB[1].replace(",","."):"?";
-                var pB=chunk.match(/цена:\s*([\d.,]+)/i);price=pB?pNum(pB[1]):0;
-                var sB=chunk.match(/сумма:\s*([\d.,]+)/i);sum=sB?pNum(sB[1]):0;
-                if(sum===0&&price>0&&qty!=="?")sum=Math.round(parseFloat(qty)*price*100)/100}}
-
-        if(!name){var mC=chunk.match(/^\d+\.\s+(.+?)(?:\s*\(код:[^)]*\))?\s*-\s*/);
-            if(mC){name=mC[1].trim();var qC=chunk.match(/([\d.,]+)\s*(шт|кг|л|уп)/i);qty=qC?qC[1].replace(",",".")+" "+qC[2]:"1";
-                var pC=chunk.match(/цена:\s*([\d\s]+[.,]\d{2})\s*руб/i);price=pC?pNum(pC[1]):0;
-                var sC=chunk.match(/сумма:\s*([\d\s]+[.,]\d{2})\s*руб/i);sum=sC?pNum(sC[1]):0;
-                if(sum===0&&price>0){var qCN=parseFloat(String(qty).replace(",","."))||1;sum=Math.round(qCN*price*100)/100}}}
-
-        if(/^(НДС|сумма НДС)/i.test(name))continue;
-        if(name&&(sum>0||price>0))items.push({name:name,qty:qty,price:price,sum:sum});
-    }
-
-    var tm=text.match(/сумма\s*\(итогов[^)]*\):\s*([\d\s]+[.,]?\d*)/i);
-    if(!tm)tm=text.match(/(?:итого|итоговая сумма|сумма к оплате|к оплате|оплачено):\s*([\d\s]+[.,]?\d*)\s*руб/i);
-    if(!tm)tm=text.match(/(?:итого|итоговая сумма):\s*([\d\s]+[.,]?\d*)/i);
-    if(tm)total=pNum(tm[1]);
+    var dm=text.match(/(?:дата чека|дата и время|дата)[:\s]*(\d{2}[\.\/]\d{2}[\.\/]\d{4})/i);date=dm?dm[1].replace(/\//g,"."):findDate(text);
+    var sm=text.match(/(?:магазин|поставщик)[^:]*:\s*(.+?)(?:\s*СПИСОК|\s*\n|\s*\d+\.\s|$)/i);if(!sm)sm=text.match(/[«"«]([^»"»]+)[»"»]/);if(sm)shop=sm[1].trim().replace(/\s*\([^)]*склад[^)]*\)\s*$/i,"").trim();
+    var t=text.replace(/(\d+)\.\s+/g,"\n$1. ");var chunks=t.split(/(?=\n\d+\.\s)/);
+    for(var i=0;i<chunks.length;i++){var chunk=chunks[i].trim();if(!/^\d+\.\s/.test(chunk))continue;var name="",qty="1",price=0,sum=0;
+        var mA=chunk.match(/^\d+\.\s+(.+?)\s*-\s*([\d.,]+)\s*(шт|кг|л|уп)\.?\s*(?:по|за|x|×)\s*([\d\s.,]+)\s*руб/i);if(mA){name=mA[1].trim();qty=mA[2].replace(",",".")+" "+mA[3];price=pNum(mA[4]);sum=Math.round(price*parseFloat(mA[2].replace(",","."))*100)/100}
+        if(!name){var mB=chunk.match(/^\d+\.\s+(.+?)\s*-\s*кол-во:/i);if(mB){name=mB[1].trim();var qB=chunk.match(/кол-во:\s*([\d.,]+)/i);qty=qB?qB[1].replace(",","."):"?";var pB=chunk.match(/цена:\s*([\d.,]+)/i);price=pB?pNum(pB[1]):0;var sB=chunk.match(/сумма:\s*([\d.,]+)/i);sum=sB?pNum(sB[1]):0;if(sum===0&&price>0&&qty!=="?")sum=Math.round(parseFloat(qty)*price*100)/100}}
+        if(!name){var mC=chunk.match(/^\d+\.\s+(.+?)(?:\s*\(код:[^)]*\))?\s*-\s*/);if(mC){name=mC[1].trim();var qC=chunk.match(/([\d.,]+)\s*(шт|кг|л|уп)/i);qty=qC?qC[1].replace(",",".")+" "+qC[2]:"1";var pC=chunk.match(/цена:\s*([\d\s]+[.,]\d{2})\s*руб/i);price=pC?pNum(pC[1]):0;var sC=chunk.match(/сумма:\s*([\d\s]+[.,]\d{2})\s*руб/i);sum=sC?pNum(sC[1]):0;if(sum===0&&price>0){var qCN=parseFloat(String(qty).replace(",","."))||1;sum=Math.round(qCN*price*100)/100}}}
+        if(/^(НДС|сумма НДС)/i.test(name))continue;if(name&&(sum>0||price>0))items.push({name:name,qty:qty,price:price,sum:sum})}
+    var tm=text.match(/сумма\s*\(итогов[^)]*\):\s*([\d\s]+[.,]?\d*)/i);if(!tm)tm=text.match(/(?:итого|итоговая сумма|сумма к оплате|к оплате|оплачено):\s*([\d\s]+[.,]?\d*)\s*руб/i);if(!tm)tm=text.match(/(?:итого|итоговая сумма):\s*([\d\s]+[.,]?\d*)/i);if(tm)total=pNum(tm[1]);
     return{shop:shop,date:date,items:items,total:total};
 }
 
-// === ПРОСТОЙ ПАРСЕР ===
-function findShopSimple(lines){
-    var shops=["магнит","пятёрочка","пятерочка","кировский","перекрёсток","перекресток","лента","ашан","монетка","красное белое","fix price","верный","дикси","окей","metro","метро","светофор","spar","вкусвилл","доброцен","каньон","агроном","карэль","раздолье"];
-    var top=lines.slice(0,5);
-    for(var i=0;i<top.length;i++){var low=top[i].toLowerCase();for(var j=0;j<shops.length;j++){if(low.indexOf(shops[j])!==-1)return top[i]}if(/^(ооо|ип|зао|оао|пао)\s/i.test(top[i]))return top[i]}
-    return top[0]||"";
-}
-function findItemsSimple(lines){
-    var items=[],total=0,tf=false;
-    for(var i=0;i<lines.length;i++){var l=lines[i];
-        if(/^(итого|итог|сумма|всего|к оплате|total)/i.test(l)){var pm=l.match(/([\d\s]+[\.,]\d{2})/);if(pm){total=pNum(pm[1]);tf=true}continue}
-        if(/^(кассир|смена|чек|документ|терминал|дата|время|инн|кпп|касса|фн|фд|фп|ндс)/i.test(l))continue;
-        var m=l.match(/^(.+?)\s+([\d\s]+[\.,]\d{2})\s*$/);
-        if(m){var n=m[1].replace(/\s{2,}/g," ").trim();var p=pNum(m[2]);if(p>=0.5&&n.length>1)items.push({name:n,qty:"1",price:p,sum:p})}
-    }
-    if(!tf&&items.length>0){items.forEach(function(it){total+=it.sum});total=Math.round(total*100)/100}
-    return{items:items,total:total};
-}
+function findShopSimple(lines){var shops=["магнит","пятёрочка","пятерочка","кировский","перекрёсток","перекресток","лента","ашан","монетка","красное белое","fix price","верный","дикси","окей","metro","метро","светофор","spar","вкусвилл","доброцен","каньон","агроном","карэль","раздолье"];var top=lines.slice(0,5);for(var i=0;i<top.length;i++){var low=top[i].toLowerCase();for(var j=0;j<shops.length;j++){if(low.indexOf(shops[j])!==-1)return top[i]}if(/^(ооо|ип|зао|оао|пао)\s/i.test(top[i]))return top[i]}return top[0]||""}
+function findItemsSimple(lines){var items=[],total=0,tf=false;for(var i=0;i<lines.length;i++){var l=lines[i];if(/^(итого|итог|сумма|всего|к оплате|total)/i.test(l)){var pm=l.match(/([\d\s]+[\.,]\d{2})/);if(pm){total=pNum(pm[1]);tf=true}continue}if(/^(кассир|смена|чек|документ|терминал|дата|время|инн|кпп|касса|фн|фд|фп|ндс)/i.test(l))continue;var m=l.match(/^(.+?)\s+([\d\s]+[\.,]\d{2})\s*$/);if(m){var n=m[1].replace(/\s{2,}/g," ").trim();var p=pNum(m[2]);if(p>=0.5&&n.length>1)items.push({name:n,qty:"1",price:p,sum:p})}}if(!tf&&items.length>0){items.forEach(function(it){total+=it.sum});total=Math.round(total*100)/100}return{items:items,total:total}}
 
 // === ОТРИСОВКА ===
 function renderItems(){
     var c=document.getElementById("itemsList");c.innerHTML="";
-    if(parsedItems.length===0){
-        c.innerHTML='<div style="padding:12px;color:#999;text-align:center">Нет товаров</div>';
-        document.getElementById("itemCount").textContent="0";return;
-    }
+    if(parsedItems.length===0){c.innerHTML='<div style="padding:12px;color:#999;text-align:center">Нет товаров</div>';document.getElementById("itemCount").textContent="0";return}
     parsedItems.forEach(function(item,i){
         var row=document.createElement("div");row.className="item-row";
-        var q=item.qty||"1";
-        var qNum=parseFloat(String(q).replace(",","."))||1;
+        var q=item.qty||"1";var qNum=parseFloat(String(q).replace(",","."))||1;
         var showQ=(qNum!==1)?'<span class="item-qty">'+escH(q)+' × '+fmtP(item.price)+'</span>':"";
         var itemSum=item.sum||calcItemSum(item);
-        row.innerHTML=
-            '<span class="item-name">'+escH(item.name)+'</span>'+showQ+
-            '<span class="item-price">'+fmtP(itemSum)+' ₽</span>'+
-            '<span class="item-delete" onclick="deleteItem('+i+')">✕</span>';
+        row.innerHTML='<span class="item-name">'+escH(item.name)+'</span>'+showQ+'<span class="item-price">'+fmtP(itemSum)+' ₽</span>'+'<span class="item-delete" onclick="deleteItem('+i+')">✕</span>';
         c.appendChild(row);
     });
     document.getElementById("itemCount").textContent=parsedItems.length;
 }
-
 function deleteItem(i){parsedItems.splice(i,1);renderItems();recalcTotal()}
-
-function recalcTotal(){
-    var t=0;parsedItems.forEach(function(it){t+=(it.sum||calcItemSum(it))});
-    document.getElementById("editTotal").textContent=fmtP(Math.round(t*100)/100)+" ₽";
-    document.getElementById("itemCount").textContent=parsedItems.length;
-}
+function recalcTotal(){var t=0;parsedItems.forEach(function(it){t+=(it.sum||calcItemSum(it))});document.getElementById("editTotal").textContent=fmtP(Math.round(t*100)/100)+" ₽";document.getElementById("itemCount").textContent=parsedItems.length}
 
 // === СОХРАНЕНИЕ ===
 function saveToSheet(){
     var shop=document.getElementById("editShop").value.trim();
     var date=document.getElementById("editDate").value.trim();
     var total=pNum(document.getElementById("editTotal").textContent.replace("₽",""));
-    if(!shop){alert("Укажи магазин!");return}
+    if(!currentUser){alert("Выбери куда записывать!");return}
     if(parsedItems.length===0){alert("Нет товаров!");return}
+
+    var cfg=CONFIG[currentUser];
+    if(!cfg){alert("Неизвестный режим!");return}
 
     showScreen("screenLoading");
 
-    var itemsForSheet=parsedItems.map(function(it){
-        return{name:it.name,qty:it.qty||"1",price:it.sum||calcItemSum(it)};
-    });
+    if(cfg.mode==="dima"){
+        // Старый формат для Димы
+        var itemsForSheet=parsedItems.map(function(it){return{name:it.name,qty:it.qty||"1",price:it.sum||calcItemSum(it)}});
+        var payload={action:"save",shop:shop,date:date,items:itemsForSheet,total:total,user:currentUser};
+        sendData(cfg.scriptUrl, payload);
 
-    var payload={action:"save",shop:shop,date:date,items:itemsForSheet,total:total,user:currentUser};
+    } else if(cfg.mode==="universal"){
+        // Универсальный формат для Стола Заказов
+        var rows=parsedItems.map(function(it){
+            var r={};
+            r[cfg.cols.name]=it.name;
+            r[cfg.cols.price]=String(it.sum||calcItemSum(it));
+            return r;
+        });
+        var payload2={
+            action:"save",
+            spreadsheetId:cfg.spreadsheetId,
+            sheetName:cfg.sheetName,
+            cols:cfg.cols,
+            rows:rows
+        };
+        sendData(cfg.scriptUrl, payload2);
+    }
+}
 
-    fetch(APPS_SCRIPT_URL,{method:"POST",body:JSON.stringify(payload)})
+function sendData(url, payload){
+    fetch(url,{method:"POST",body:JSON.stringify(payload)})
     .then(function(r){return r.text()})
     .then(function(text){
         try{var res=JSON.parse(text);if(res.status==="ok")showResult(true,"Сохранено! ✓");else showResult(false,"Ошибка: "+(res.message||""))}
@@ -378,6 +347,7 @@ function saveToSheet(){
     })
     .catch(function(err){showResult(false,"Ошибка сети: "+err.message)});
 }
+
 function showResult(ok,msg){
     document.getElementById("resultIcon").textContent=ok?"✅":"❌";
     document.getElementById("resultText").textContent=msg;
