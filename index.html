@@ -79,14 +79,7 @@
         <button class="prompt-toggle" onclick="togglePrompt()">📋 Показать промт для Алисы</button>
     </div>
     <div id="promptBox" class="prompt-box">
-        <pre id="promptText">Распознай чек с фото. Выдай ТОЛЬКО в таком формате:
-
-ДАТА: ДД.ММ.ГГГГ
-МАГАЗИН: название
-ТОВАР: название | кол-во | цена за шт
-ИТОГО: число
-
-Числа без "руб" и "₽". Никаких комментариев и реквизитов.</pre>
+        <pre id="promptText"></pre>
         <button class="copy-btn" onclick="copyPrompt()">📋 Скопировать промт</button>
     </div>
     <div class="field"><label for="rawText">Текст от Алисы:</label><textarea id="rawText" placeholder="Вставь текст от Алисы..."></textarea></div>
@@ -99,8 +92,8 @@
 <div id="screen2" class="screen">
     <div id="dimaFields">
         <div class="field"><label for="editShop">Магазин:</label><input type="text" id="editShop"></div>
+        <div class="field"><label for="editDate">Дата:</label><input type="text" id="editDate" placeholder="ДД.ММ.ГГГГ"></div>
     </div>
-    <div class="field"><label for="editDate">Дата:</label><input type="text" id="editDate" placeholder="ДД.ММ.ГГГГ"></div>
     <div class="field">
         <label>Товары <span id="itemCount" class="count-badge">0</span></label>
         <div id="itemsList" class="items-list"></div>
@@ -108,7 +101,7 @@
         <div class="add-form">
             <div class="add-form-title">＋ Добавить товар:</div>
             <div class="add-form-row">
-                <input class="add-name" id="addName" placeholder="Название" onkeydown="if(event.key==='Enter'){document.getElementById('addQty').focus()}">
+                <input class="add-name" id="addName" placeholder="Название" onkeydown="if(event.key==='Enter'){var q=document.getElementById('addQty');if(q.style.display!=='none')q.focus();else document.getElementById('addPrice').focus()}">
                 <input class="add-qty" id="addQty" placeholder="Кол-во" value="1" onkeydown="if(event.key==='Enter'){document.getElementById('addPrice').focus()}">
                 <input class="add-price" id="addPrice" placeholder="Цена/шт" type="number" step="0.01" onkeydown="if(event.key==='Enter')addItemFromForm()">
             </div>
@@ -133,18 +126,31 @@
 </div>
 
 <script>
-// === НАСТРОЙКИ ТАБЛИЦ ===
+// === ПРОМТЫ ===
+var PROMPT_DIMA = "Распознай чек с фото. Выдай ТОЛЬКО в таком формате:\n\nДАТА: ДД.ММ.ГГГГ\nМАГАЗИН: название\nТОВАР: название | кол-во | цена за шт\nИТОГО: число\n\nЧисла без \"руб\" и \"₽\". Никаких комментариев и реквизитов.";
+
+var PROMPT_STOL = "Распознай чек с фото. Выдай ТОЛЬКО так:\n\nТОВАР: название | цена\nТОВАР: название | цена\n\nЦены числами без \"руб\". Ничего лишнего.";
+
+// === НАСТРОЙКИ ===
 var CONFIG = {
     "Дима": {
         scriptUrl: "https://script.google.com/macros/s/AKfycbxhv8Ur7DVQKd6J6gwQV5lVrCFApQrEZbjleVNiPeZHOlLUe7qojKr6EvZqLColE5Ehag/exec",
-        mode: "dima" // старый формат
+        mode: "dima",
+        prompt: PROMPT_DIMA,
+        showShop: true,
+        showDate: true,
+        showQty: true
     },
     "Стол Заказов": {
         scriptUrl: "https://script.google.com/macros/s/AKfycbxiHCZDLRzRLlNynsFdJz-ay7OhuDF9lO3AiRcb--Um_yATCh6HKmHZS-kIhgdoxBLtxw/exec",
         spreadsheetId: "1FwfUz2nFk0faLdhbohwG4FGmyPZ8nTg9QSRBITT-VCY",
         sheetName: "Лист1",
-        cols: {name: "B", qty: "C", price: "D"},
-        mode: "universal"
+        cols: {name: "B", price: "D"},
+        mode: "universal",
+        prompt: PROMPT_STOL,
+        showShop: false,
+        showDate: false,
+        showQty: false
     }
 };
 
@@ -156,7 +162,7 @@ document.addEventListener("DOMContentLoaded", function(){
         document.querySelectorAll(".user-btn").forEach(function(b){
             if(b.dataset.user===currentUser) b.classList.add("selected");
         });
-        updateModeLabel();
+        updateUI();
     }
 });
 
@@ -169,19 +175,29 @@ function selectUser(btn){
     btn.classList.add("selected");
     currentUser=btn.dataset.user;
     localStorage.setItem("cheki_user",currentUser);
-    updateModeLabel();
+    updateUI();
 }
 
-function updateModeLabel(){
-    var el=document.getElementById("modeLabel");
+function updateUI(){
     var cfg=CONFIG[currentUser];
-    if(!cfg){el.textContent="";return}
-    if(currentUser==="Дима") el.textContent="📊 Таблица Димы";
-    else el.textContent="📊 Стол Заказов";
+    if(!cfg) return;
+    // Лейбл
+    var el=document.getElementById("modeLabel");
+    el.textContent="📊 "+currentUser;
+    // Промт
+    document.getElementById("promptText").textContent=cfg.prompt;
+    // Скрываем промт если был открыт
+    document.getElementById("promptBox").classList.remove("visible");
+}
 
-    // Показываем/скрываем поле магазина
-    var dimaFields=document.getElementById("dimaFields");
-    if(dimaFields) dimaFields.style.display=(currentUser==="Дима")?"block":"none";
+function updateScreen2(){
+    var cfg=CONFIG[currentUser];
+    if(!cfg) return;
+    // Поля магазин/дата
+    document.getElementById("dimaFields").style.display=cfg.showShop?"block":"none";
+    // Поле кол-во в форме добавления
+    document.getElementById("addQty").style.display=cfg.showQty?"block":"none";
+    if(!cfg.showQty) document.getElementById("addQty").value="1";
 }
 
 function togglePrompt(){document.getElementById("promptBox").classList.toggle("visible")}
@@ -206,7 +222,8 @@ function addItemFromForm(){
     var qtyEl=document.getElementById("addQty");
     var priceEl=document.getElementById("addPrice");
     var name=nameEl.value.trim();
-    var qty=qtyEl.value.trim()||"1";
+    var cfg=CONFIG[currentUser]||{};
+    var qty=cfg.showQty?(qtyEl.value.trim()||"1"):"1";
     var price=parseFloat(priceEl.value)||0;
     if(!name){alert("Введи название!");nameEl.focus();return}
     if(price<=0){alert("Введи цену!");priceEl.focus();return}
@@ -220,10 +237,9 @@ function addItemFromForm(){
 function manualEntry(){
     if(!currentUser){alert("Выбери куда записывать!");return}
     parsedItems=[];
-    var d=new Date();
     document.getElementById("editShop").value="";
-    document.getElementById("editDate").value=String(d.getDate()).padStart(2,"0")+"."+String(d.getMonth()+1).padStart(2,"0")+"."+d.getFullYear();
-    renderItems();recalcTotal();updateModeLabel();
+    document.getElementById("editDate").value=findDate("");
+    renderItems();recalcTotal();updateScreen2();
     showScreen("screen2");
     setTimeout(function(){document.getElementById("addName").focus()},100);
 }
@@ -231,20 +247,49 @@ function manualEntry(){
 // === ПАРСЕР ===
 function parseReceipt(){
     var raw=document.getElementById("rawText").value.trim();
-    if(!raw){alert("Вставь текст чека!");return}
+    if(!raw){alert("Вставь текст!");return}
     if(!currentUser){alert("Выбери куда записывать!");return}
     var text=norm(raw);
     var shop="",date="",items=[],total=0;
-    var hasLabels=/(?:ДАТА_ЧЕКА|МАГАЗИН|ТОВАР):/i.test(text);
-    var hasNumberedItems=/\d+\.\s+.+[-—]/i.test(text);
-    if(hasLabels&&!hasNumberedItems){var r=parseLabeled(text);shop=r.shop;date=r.date;items=r.items;total=r.total}
-    else if(hasNumberedItems){var r2=parseNumbered(text);shop=r2.shop;date=r2.date;items=r2.items;total=r2.total}
-    else{var lines=text.split("\n").map(function(l){return l.trim()}).filter(function(l){return l});shop=findShopSimple(lines);date=findDate(text);var r3=findItemsSimple(lines);items=r3.items;total=r3.total}
+    var cfg=CONFIG[currentUser]||{};
+
+    // Формат Стола: только ТОВАР: название | цена (без кол-ва)
+    if(cfg.mode==="universal" && /ТОВАР:.+\|/i.test(text)){
+        // Парсим формат ТОВАР: название | цена
+        var t=text.replace(/(ТОВАР):/gi,"\n$1:");
+        var lines=t.split("\n").map(function(l){return l.trim()}).filter(function(l){return l});
+        for(var i=0;i<lines.length;i++){
+            // Формат: ТОВАР: название | цена
+            var m2=lines[i].match(/^ТОВАР:\s*(.+?)\s*\|\s*([\d\s.,]+)/i);
+            if(m2){
+                items.push({name:m2[1].trim(),qty:"1",price:pNum(m2[2]),sum:pNum(m2[2])});
+                continue;
+            }
+            // Формат: ТОВАР: название | кол-во | цена
+            var m3=lines[i].match(/^ТОВАР:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*([\d\s.,]+)/i);
+            if(m3){
+                var nm=m3[1].trim(),qt=m3[2].trim(),p=pNum(m3[3]);
+                var qn=parseFloat(qt.replace(",","."))||1;
+                items.push({name:nm,qty:qt,price:p,sum:Math.round(qn*p*100)/100});
+            }
+        }
+        var totalM=text.match(/(?:ИТОГО):\s*([\d\s.,]+)/i);
+        if(totalM)total=pNum(totalM[1]);
+    } else {
+        // Стандартный парсер для Димы
+        var hasLabels=/(?:ДАТА_ЧЕКА|МАГАЗИН|ТОВАР):/i.test(text);
+        var hasNumberedItems=/\d+\.\s+.+[-—]/i.test(text);
+        if(hasLabels&&!hasNumberedItems){var r=parseLabeled(text);shop=r.shop;date=r.date;items=r.items;total=r.total}
+        else if(hasNumberedItems){var r2=parseNumbered(text);shop=r2.shop;date=r2.date;items=r2.items;total=r2.total}
+        else{var lines2=text.split("\n").map(function(l){return l.trim()}).filter(function(l){return l});shop=findShopSimple(lines2);date=findDate(text);var r3=findItemsSimple(lines2);items=r3.items;total=r3.total}
+    }
+
     if(total===0&&items.length>0){items.forEach(function(it){total+=it.sum||calcItemSum(it)});total=Math.round(total*100)/100}
+
     parsedItems=items;
     document.getElementById("editShop").value=shop;
-    document.getElementById("editDate").value=date;
-    renderItems();recalcTotal();updateModeLabel();
+    document.getElementById("editDate").value=date||findDate("");
+    renderItems();recalcTotal();updateScreen2();
     showScreen("screen2");
 }
 
@@ -286,11 +331,12 @@ function findItemsSimple(lines){var items=[],total=0,tf=false;for(var i=0;i<line
 // === ОТРИСОВКА ===
 function renderItems(){
     var c=document.getElementById("itemsList");c.innerHTML="";
+    var cfg=CONFIG[currentUser]||{};
     if(parsedItems.length===0){c.innerHTML='<div style="padding:12px;color:#999;text-align:center">Нет товаров</div>';document.getElementById("itemCount").textContent="0";return}
     parsedItems.forEach(function(item,i){
         var row=document.createElement("div");row.className="item-row";
         var q=item.qty||"1";var qNum=parseFloat(String(q).replace(",","."))||1;
-        var showQ=(qNum!==1)?'<span class="item-qty">'+escH(q)+' × '+fmtP(item.price)+'</span>':"";
+        var showQ=(cfg.showQty!==false&&qNum!==1)?'<span class="item-qty">'+escH(q)+' × '+fmtP(item.price)+'</span>':"";
         var itemSum=item.sum||calcItemSum(item);
         row.innerHTML='<span class="item-name">'+escH(item.name)+'</span>'+showQ+'<span class="item-price">'+fmtP(itemSum)+' ₽</span>'+'<span class="item-delete" onclick="deleteItem('+i+')">✕</span>';
         c.appendChild(row);
@@ -309,36 +355,31 @@ function saveToSheet(){
     if(parsedItems.length===0){alert("Нет товаров!");return}
 
     var cfg=CONFIG[currentUser];
-    if(!cfg){alert("Неизвестный режим!");return}
+    if(!cfg){alert("Ошибка настроек!");return}
+
+    // Для Димы проверяем магазин
+    if(cfg.showShop&&!shop){alert("Укажи магазин!");return}
 
     showScreen("screenLoading");
 
     if(cfg.mode==="dima"){
-        // Старый формат для Димы
         var itemsForSheet=parsedItems.map(function(it){return{name:it.name,qty:it.qty||"1",price:it.sum||calcItemSum(it)}});
         var payload={action:"save",shop:shop,date:date,items:itemsForSheet,total:total,user:currentUser};
-        sendData(cfg.scriptUrl, payload);
-
-    } else if(cfg.mode==="universal"){
-        // Универсальный формат для Стола Заказов
+        sendData(cfg.scriptUrl,payload);
+    } else {
+        // Универсальный — только B и D
         var rows=parsedItems.map(function(it){
             var r={};
             r[cfg.cols.name]=it.name;
             r[cfg.cols.price]=String(it.sum||calcItemSum(it));
             return r;
         });
-        var payload2={
-            action:"save",
-            spreadsheetId:cfg.spreadsheetId,
-            sheetName:cfg.sheetName,
-            cols:cfg.cols,
-            rows:rows
-        };
-        sendData(cfg.scriptUrl, payload2);
+        var payload2={action:"save",spreadsheetId:cfg.spreadsheetId,sheetName:cfg.sheetName,cols:cfg.cols,rows:rows};
+        sendData(cfg.scriptUrl,payload2);
     }
 }
 
-function sendData(url, payload){
+function sendData(url,payload){
     fetch(url,{method:"POST",body:JSON.stringify(payload)})
     .then(function(r){return r.text()})
     .then(function(text){
