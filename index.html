@@ -59,6 +59,7 @@
         .add-btn{background:#2196F3;color:#fff;border:none;border-radius:10px;padding:12px;font-size:15px;font-weight:600;cursor:pointer;width:100%}
         .add-btn:active{opacity:.7}
         .mode-label{text-align:center;font-size:13px;color:#888;margin-bottom:4px}
+        .dupes-info{text-align:center;font-size:13px;color:#FF9800;margin-top:8px;font-weight:600}
     </style>
 </head>
 <body>
@@ -72,7 +73,6 @@
         <div class="user-btn" data-user="Стол Заказов" onclick="selectUser(this)">Стол Заказов</div>
     </div>
     <div id="modeLabel" class="mode-label"></div>
-
     <div class="hint">
         📱 Откройте Алису → отправьте промт (ниже) → сфотографируйте чек → скопируйте ответ → вставьте сюда
         <br><br>
@@ -97,7 +97,7 @@
     <div class="field">
         <label>Товары <span id="itemCount" class="count-badge">0</span></label>
         <div id="itemsList" class="items-list"></div>
-
+        <div id="dupesInfo" class="dupes-info"></div>
         <div class="add-form">
             <div class="add-form-title">＋ Добавить товар:</div>
             <div class="add-form-row">
@@ -107,7 +107,6 @@
             </div>
             <button class="add-btn" onclick="addItemFromForm()">＋ Добавить</button>
         </div>
-
         <div class="total-line"><span>Итого:</span><span id="editTotal">0 ₽</span></div>
     </div>
     <button class="btn btn-green" onclick="saveToSheet()">💾 Сохранить в таблицу</button>
@@ -126,78 +125,45 @@
 </div>
 
 <script>
-// === ПРОМТЫ ===
-var PROMPT_DIMA = "Распознай чек с фото. Выдай ТОЛЬКО в таком формате:\n\nДАТА: ДД.ММ.ГГГГ\nМАГАЗИН: название\nТОВАР: название | кол-во | цена за шт\nИТОГО: число\n\nЧисла без \"руб\" и \"₽\". Никаких комментариев и реквизитов.";
+var PROMPT_DIMA="Распознай чек с фото. Выдай ТОЛЬКО в таком формате:\n\nДАТА: ДД.ММ.ГГГГ\nМАГАЗИН: название\nТОВАР: название | кол-во | цена за шт\nИТОГО: число\n\nЧисла без \"руб\" и \"₽\". Никаких комментариев и реквизитов.";
+var PROMPT_STOL="Распознай чек с фото. Выдай ТОЛЬКО так:\n\nТОВАР: название | цена\nТОВАР: название | цена\n\nЦены числами без \"руб\". Ничего лишнего.";
 
-var PROMPT_STOL = "Распознай чек с фото. Выдай ТОЛЬКО так:\n\nТОВАР: название | цена\nТОВАР: название | цена\n\nЦены числами без \"руб\". Ничего лишнего.";
-
-// === НАСТРОЙКИ ===
-var CONFIG = {
-    "Дима": {
-        scriptUrl: "https://script.google.com/macros/s/AKfycbxhv8Ur7DVQKd6J6gwQV5lVrCFApQrEZbjleVNiPeZHOlLUe7qojKr6EvZqLColE5Ehag/exec",
-        mode: "dima",
-        prompt: PROMPT_DIMA,
-        showShop: true,
-        showDate: true,
-        showQty: true
+var CONFIG={
+    "Дима":{
+        scriptUrl:"https://script.google.com/macros/s/AKfycbxhv8Ur7DVQKd6J6gwQV5lVrCFApQrEZbjleVNiPeZHOlLUe7qojKr6EvZqLColE5Ehag/exec",
+        mode:"dima",prompt:PROMPT_DIMA,showShop:true,showDate:true,showQty:true,removeDupes:false
     },
-    "Стол Заказов": {
-        scriptUrl: "https://script.google.com/macros/s/AKfycbxiHCZDLRzRLlNynsFdJz-ay7OhuDF9lO3AiRcb--Um_yATCh6HKmHZS-kIhgdoxBLtxw/exec",
-        spreadsheetId: "1PfgLkeBGqM5krJRvUcIVDRusMoYRZFRV_YrjKPirI4Q",
-        sheetName: "Лист1",
-        cols: {name: "B", price: "D"},
-        mode: "universal",
-        prompt: PROMPT_STOL,
-        showShop: false,
-        showDate: false,
-        showQty: false
+    "Стол Заказов":{
+        scriptUrl:"https://script.google.com/macros/s/AKfycbxiHCZDLRzRLlNynsFdJz-ay7OhuDF9lO3AiRcb--Um_yATCh6HKmHZS-kIhgdoxBLtxw/exec",
+        spreadsheetId:"1PfgLkeBGqM5krJRvUcIVDRusMoYRZFRV_YrjKPirI4Q",
+        sheetName:"Лист1",cols:{name:"B",price:"D"},
+        mode:"universal",prompt:PROMPT_STOL,showShop:false,showDate:false,showQty:false,removeDupes:true
     }
 };
 
-var currentUser = localStorage.getItem("cheki_user") || "";
-var parsedItems = [];
+var currentUser=localStorage.getItem("cheki_user")||"";
+var parsedItems=[];
 
-document.addEventListener("DOMContentLoaded", function(){
-    if(currentUser){
-        document.querySelectorAll(".user-btn").forEach(function(b){
-            if(b.dataset.user===currentUser) b.classList.add("selected");
-        });
-        updateUI();
-    }
+document.addEventListener("DOMContentLoaded",function(){
+    if(currentUser){document.querySelectorAll(".user-btn").forEach(function(b){if(b.dataset.user===currentUser)b.classList.add("selected")});updateUI()}
 });
-
 function showScreen(id){document.querySelectorAll(".screen").forEach(function(s){s.classList.remove("active")});document.getElementById(id).classList.add("active");window.scrollTo(0,0)}
 function goBack(){showScreen("screen1")}
-function newReceipt(){document.getElementById("rawText").value="";parsedItems=[];showScreen("screen1")}
-
-function selectUser(btn){
-    document.querySelectorAll(".user-btn").forEach(function(b){b.classList.remove("selected")});
-    btn.classList.add("selected");
-    currentUser=btn.dataset.user;
-    localStorage.setItem("cheki_user",currentUser);
-    updateUI();
-}
+function newReceipt(){document.getElementById("rawText").value="";parsedItems=[];document.getElementById("dupesInfo").textContent="";showScreen("screen1")}
+function selectUser(btn){document.querySelectorAll(".user-btn").forEach(function(b){b.classList.remove("selected")});btn.classList.add("selected");currentUser=btn.dataset.user;localStorage.setItem("cheki_user",currentUser);updateUI()}
 
 function updateUI(){
-    var cfg=CONFIG[currentUser];
-    if(!cfg) return;
-    // Лейбл
-    var el=document.getElementById("modeLabel");
-    el.textContent="📊 "+currentUser;
-    // Промт
+    var cfg=CONFIG[currentUser];if(!cfg)return;
+    document.getElementById("modeLabel").textContent="📊 "+currentUser;
     document.getElementById("promptText").textContent=cfg.prompt;
-    // Скрываем промт если был открыт
     document.getElementById("promptBox").classList.remove("visible");
 }
-
 function updateScreen2(){
-    var cfg=CONFIG[currentUser];
-    if(!cfg) return;
-    // Поля магазин/дата
+    var cfg=CONFIG[currentUser];if(!cfg)return;
     document.getElementById("dimaFields").style.display=cfg.showShop?"block":"none";
-    // Поле кол-во в форме добавления
     document.getElementById("addQty").style.display=cfg.showQty?"block":"none";
-    if(!cfg.showQty) document.getElementById("addQty").value="1";
+    if(!cfg.showQty)document.getElementById("addQty").value="1";
+    document.getElementById("dupesInfo").textContent="";
 }
 
 function togglePrompt(){document.getElementById("promptBox").classList.toggle("visible")}
@@ -216,13 +182,21 @@ function fmtP(n){return n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g," ")}
 function escH(t){var d=document.createElement("div");d.textContent=t;return d.innerHTML}
 function calcItemSum(item){var q=parseFloat(String(item.qty).replace(",","."))||1;return Math.round(q*item.price*100)/100}
 
+// === УДАЛЕНИЕ ДУБЛЕЙ ===
+function removeDuplicates(items){
+    var seen={};var unique=[];var dupeCount=0;
+    for(var i=0;i<items.length;i++){
+        var key=items[i].name.toLowerCase().trim()+"|||"+String(items[i].sum||items[i].price);
+        if(!seen[key]){seen[key]=true;unique.push(items[i])}
+        else{dupeCount++}
+    }
+    return{items:unique,removed:dupeCount};
+}
+
 // === ДОБАВЛЕНИЕ ТОВАРА ===
 function addItemFromForm(){
-    var nameEl=document.getElementById("addName");
-    var qtyEl=document.getElementById("addQty");
-    var priceEl=document.getElementById("addPrice");
-    var name=nameEl.value.trim();
-    var cfg=CONFIG[currentUser]||{};
+    var nameEl=document.getElementById("addName");var qtyEl=document.getElementById("addQty");var priceEl=document.getElementById("addPrice");
+    var name=nameEl.value.trim();var cfg=CONFIG[currentUser]||{};
     var qty=cfg.showQty?(qtyEl.value.trim()||"1"):"1";
     var price=parseFloat(priceEl.value)||0;
     if(!name){alert("Введи название!");nameEl.focus();return}
@@ -236,11 +210,8 @@ function addItemFromForm(){
 
 function manualEntry(){
     if(!currentUser){alert("Выбери куда записывать!");return}
-    parsedItems=[];
-    document.getElementById("editShop").value="";
-    document.getElementById("editDate").value=findDate("");
-    renderItems();recalcTotal();updateScreen2();
-    showScreen("screen2");
+    parsedItems=[];document.getElementById("editShop").value="";document.getElementById("editDate").value=findDate("");
+    renderItems();recalcTotal();updateScreen2();showScreen("screen2");
     setTimeout(function(){document.getElementById("addName").focus()},100);
 }
 
@@ -249,48 +220,36 @@ function parseReceipt(){
     var raw=document.getElementById("rawText").value.trim();
     if(!raw){alert("Вставь текст!");return}
     if(!currentUser){alert("Выбери куда записывать!");return}
-    var text=norm(raw);
-    var shop="",date="",items=[],total=0;
-    var cfg=CONFIG[currentUser]||{};
+    var text=norm(raw);var shop="",date="",items=[],total=0;var cfg=CONFIG[currentUser]||{};
 
-    // Формат Стола: только ТОВАР: название | цена (без кол-ва)
-    if(cfg.mode==="universal" && /ТОВАР:.+\|/i.test(text)){
-        // Парсим формат ТОВАР: название | цена
+    if(cfg.mode==="universal"&&/ТОВАР:.+\|/i.test(text)){
         var t=text.replace(/(ТОВАР):/gi,"\n$1:");
         var lines=t.split("\n").map(function(l){return l.trim()}).filter(function(l){return l});
         for(var i=0;i<lines.length;i++){
-            // Формат: ТОВАР: название | цена
-            var m2=lines[i].match(/^ТОВАР:\s*(.+?)\s*\|\s*([\d\s.,]+)/i);
-            if(m2){
-                items.push({name:m2[1].trim(),qty:"1",price:pNum(m2[2]),sum:pNum(m2[2])});
-                continue;
-            }
-            // Формат: ТОВАР: название | кол-во | цена
+            var m2=lines[i].match(/^ТОВАР:\s*(.+?)\s*\|\s*([\d\s.,]+)\s*$/i);
+            if(m2){items.push({name:m2[1].trim(),qty:"1",price:pNum(m2[2]),sum:pNum(m2[2])});continue}
             var m3=lines[i].match(/^ТОВАР:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*([\d\s.,]+)/i);
-            if(m3){
-                var nm=m3[1].trim(),qt=m3[2].trim(),p=pNum(m3[3]);
-                var qn=parseFloat(qt.replace(",","."))||1;
-                items.push({name:nm,qty:qt,price:p,sum:Math.round(qn*p*100)/100});
-            }
+            if(m3){var nm=m3[1].trim(),qt=m3[2].trim(),p=pNum(m3[3]),qn=parseFloat(qt.replace(",","."))||1;items.push({name:nm,qty:qt,price:p,sum:Math.round(qn*p*100)/100})}
         }
-        var totalM=text.match(/(?:ИТОГО):\s*([\d\s.,]+)/i);
-        if(totalM)total=pNum(totalM[1]);
-    } else {
-        // Стандартный парсер для Димы
+        var totalM=text.match(/(?:ИТОГО):\s*([\d\s.,]+)/i);if(totalM)total=pNum(totalM[1]);
+    }else{
         var hasLabels=/(?:ДАТА_ЧЕКА|МАГАЗИН|ТОВАР):/i.test(text);
         var hasNumberedItems=/\d+\.\s+.+[-—]/i.test(text);
         if(hasLabels&&!hasNumberedItems){var r=parseLabeled(text);shop=r.shop;date=r.date;items=r.items;total=r.total}
         else if(hasNumberedItems){var r2=parseNumbered(text);shop=r2.shop;date=r2.date;items=r2.items;total=r2.total}
         else{var lines2=text.split("\n").map(function(l){return l.trim()}).filter(function(l){return l});shop=findShopSimple(lines2);date=findDate(text);var r3=findItemsSimple(lines2);items=r3.items;total=r3.total}
     }
-
     if(total===0&&items.length>0){items.forEach(function(it){total+=it.sum||calcItemSum(it)});total=Math.round(total*100)/100}
 
-    parsedItems=items;
-    document.getElementById("editShop").value=shop;
-    document.getElementById("editDate").value=date||findDate("");
-    renderItems();recalcTotal();updateScreen2();
-    showScreen("screen2");
+    // Убираем дубли для Стола Заказов
+    if(cfg.removeDupes&&items.length>0){
+        var dr=removeDuplicates(items);items=dr.items;
+        if(dr.removed>0)document.getElementById("dupesInfo").textContent="⚡ Убрано дублей: "+dr.removed;
+        else document.getElementById("dupesInfo").textContent="";
+    }else{document.getElementById("dupesInfo").textContent=""}
+
+    parsedItems=items;document.getElementById("editShop").value=shop;document.getElementById("editDate").value=date||findDate("");
+    renderItems();recalcTotal();updateScreen2();showScreen("screen2");
 }
 
 function parseLabeled(text){
@@ -330,8 +289,7 @@ function findItemsSimple(lines){var items=[],total=0,tf=false;for(var i=0;i<line
 
 // === ОТРИСОВКА ===
 function renderItems(){
-    var c=document.getElementById("itemsList");c.innerHTML="";
-    var cfg=CONFIG[currentUser]||{};
+    var c=document.getElementById("itemsList");c.innerHTML="";var cfg=CONFIG[currentUser]||{};
     if(parsedItems.length===0){c.innerHTML='<div style="padding:12px;color:#999;text-align:center">Нет товаров</div>';document.getElementById("itemCount").textContent="0";return}
     parsedItems.forEach(function(item,i){
         var row=document.createElement("div");row.className="item-row";
@@ -353,11 +311,7 @@ function saveToSheet(){
     var total=pNum(document.getElementById("editTotal").textContent.replace("₽",""));
     if(!currentUser){alert("Выбери куда записывать!");return}
     if(parsedItems.length===0){alert("Нет товаров!");return}
-
-    var cfg=CONFIG[currentUser];
-    if(!cfg){alert("Ошибка настроек!");return}
-
-    // Для Димы проверяем магазин
+    var cfg=CONFIG[currentUser];if(!cfg){alert("Ошибка!");return}
     if(cfg.showShop&&!shop){alert("Укажи магазин!");return}
 
     showScreen("screenLoading");
@@ -366,14 +320,14 @@ function saveToSheet(){
         var itemsForSheet=parsedItems.map(function(it){return{name:it.name,qty:it.qty||"1",price:it.sum||calcItemSum(it)}});
         var payload={action:"save",shop:shop,date:date,items:itemsForSheet,total:total,user:currentUser};
         sendData(cfg.scriptUrl,payload);
-    } else {
-        // Универсальный — только B и D
-        var rows=parsedItems.map(function(it){
-            var r={};
-            r[cfg.cols.name]=it.name;
-            r[cfg.cols.price]=String(it.sum||calcItemSum(it));
-            return r;
-        });
+    }else{
+        var rows=parsedItems.map(function(it){var r={};r[cfg.cols.name]=it.name;r[cfg.cols.price]=String(it.sum||calcItemSum(it));return r});
+        // Убираем дубли перед отправкой
+        if(cfg.removeDupes){
+            var seen={};var uniqueRows=[];
+            for(var i=0;i<rows.length;i++){var key=rows[i][cfg.cols.name]+"|||"+rows[i][cfg.cols.price];if(!seen[key]){seen[key]=true;uniqueRows.push(rows[i])}}
+            rows=uniqueRows;
+        }
         var payload2={action:"save",spreadsheetId:cfg.spreadsheetId,sheetName:cfg.sheetName,cols:cfg.cols,rows:rows};
         sendData(cfg.scriptUrl,payload2);
     }
